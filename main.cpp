@@ -43,9 +43,14 @@ namespace  {
     }
 } // namespace
 
-int main(int /*argc*/, char * argv[]) {
+int main(int argc, char * argv[]) {
+    if(argc != 3){
+        std::cout << "cds PATTERN PATH" << std::endl;
+        return 1;
+    }
+
     auto files = rxcpp::sources::create<boost::filesystem::path>(
-        [p = boost::filesystem::path(argv[1])](rxcpp::subscriber<boost::filesystem::path> sub) {
+        [p = boost::filesystem::path(argv[2])](rxcpp::subscriber<boost::filesystem::path> sub) {
             try{
                 std::for_each(boost::filesystem::recursive_directory_iterator(p),
                               boost::filesystem::recursive_directory_iterator(),
@@ -61,14 +66,13 @@ int main(int /*argc*/, char * argv[]) {
             sub.on_completed();
         })
         .filter([](const auto& p){
-                std::cout << p << newline;
                 return boost::filesystem::is_regular(p);
             })
-        .map([](const auto& p) {
+        .map([pattern = argv[1]](const auto& p) {
                 return std::make_shared<file_reader>(
                     boost::interprocess::file_mapping(p.string().c_str(), boost::interprocess::read_only),
                     boost::filesystem::file_size(p),
-                    std::regex(std::string{R"(.+directory[^$]+)"})
+                    std::regex(pattern)
                     );
             })
         // .flat_map(
@@ -88,10 +92,9 @@ int main(int /*argc*/, char * argv[]) {
                 return utf8::is_valid(static_cast<char const*>(r->m.get_address()), static_cast<char const*>(r->m.get_address()) + r->m.get_size()) && r->begin() != r->end();
             })
         .subscribe([](const auto& p){
-                std::cout << "in subscribe" << newline;
                 try {
-                    std::cout << p->f.get_name() << newline;
-                    std::cout << p->m.get_size() << newline;
+                    std::cout << p->f.get_name() << ":" << p->m.get_size() << newline;
+
                     for(auto&& m : *p){
                         std::cout << m[0] << newline;
                     }
