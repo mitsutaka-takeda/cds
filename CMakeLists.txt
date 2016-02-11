@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.3)
 project(cds CXX C)
 
 find_package(Boost 1.59.0 REQUIRED QUIET COMPONENTS filesystem system)
+find_package(Threads)
 
 if(NOT TARGET RxCpp)
   add_subdirectory("../RxCpp" "${CMAKE_BINARY_DIR}/RxCpp")
@@ -32,6 +33,7 @@ target_link_libraries(
   utfcpp
   ${Boost_FILESYSTEM_LIBRARY}
   ${Boost_SYSTEM_LIBRARY}
+  Threads::Threads
   )
 
 target_include_directories(

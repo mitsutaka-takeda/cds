@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <iterator>
 #include <string>
+#include <thread>
 #include <iostream>
 #include <regex>
 
@@ -49,8 +50,11 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
-    auto files = rxcpp::sources::create<boost::filesystem::path>(
+    std::ios_base::sync_with_stdio(false);
+    std::cout << "main thread: " << std::this_thread::get_id() << newline;
+    auto matches = rxcpp::sources::create<boost::filesystem::path>(
         [p = boost::filesystem::path(argv[2])](rxcpp::subscriber<boost::filesystem::path> sub) {
+            std::cout << "observable thread: " << std::this_thread::get_id() << newline;
             try{
                 std::for_each(boost::filesystem::recursive_directory_iterator(p),
                               boost::filesystem::recursive_directory_iterator(),
@@ -90,11 +94,16 @@ int main(int argc, char * argv[]) {
                 // @todo Don't forget to remove after debugging!
                 // @todo Don't forget to remove after debugging!
                 return utf8::is_valid(static_cast<char const*>(r->m.get_address()), static_cast<char const*>(r->m.get_address()) + r->m.get_size()) && r->begin() != r->end();
-            })
+            });
+
+    matches
+        // .observe_on(rxcpp::synchronize_new_thread())
+        // .observe_on(rxcpp::serialize_new_thread())
+        .observe_on(rxcpp::observe_on_new_thread())
         .subscribe([](const auto& p){
+                std::cout << "observing thread: " << std::this_thread::get_id() << newline;
                 try {
                     std::cout << p->f.get_name() << ":" << p->m.get_size() << newline;
-
                     for(auto&& m : *p){
                         std::cout << m[0] << newline;
                     }
