@@ -96,6 +96,8 @@ int main(int argc, char * argv[]) {
                 return utf8::is_valid(static_cast<char const*>(r->m.get_address()), static_cast<char const*>(r->m.get_address()) + r->m.get_size()) && r->begin() != r->end();
             });
 
+    std::promise<void> pr;
+    auto f = pr.get_future();
     matches
         // .observe_on(rxcpp::synchronize_new_thread())
         // .observe_on(rxcpp::serialize_new_thread())
@@ -110,8 +112,13 @@ int main(int argc, char * argv[]) {
                 } catch(...){
                     std::cout << "something bad happend!" << std::endl;
                 }
-        });
+            },
+            [&pr](){
+                pr.set_value();
+            }
+            );
 
+    f.wait();
     std::cout << "last" << std::endl;
     
     return 0;
