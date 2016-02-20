@@ -16,6 +16,9 @@ endif()
 add_executable(
   cds
   main.cpp
+  rx-threadpool.hpp
+  rx-threadpool.cpp
+  task-system.hpp
   )
 
 target_compile_options(

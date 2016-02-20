@@ -1,3 +1,5 @@
+#include <iostream>
+#include <thread>
 #include <rxcpp/rx.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
@@ -7,11 +9,10 @@
 #include <algorithm>
 #include <iterator>
 #include <string>
-#include <thread>
-#include <iostream>
 #include <regex>
 
 #include "utf8.h"
+#include "rx-threadpool.hpp"
 
 namespace  {
     struct file_reader {
@@ -23,13 +24,13 @@ namespace  {
               r(std::move(r_))
             {}
         std::cregex_iterator
-        begin() {
+        begin() const {
             return std::cregex_iterator(static_cast<const char*>(m.get_address()),
                                          static_cast<const char*>(m.get_address()) + m.get_size(),
                                          r);
         }
 
-        std::cregex_iterator end() {
+        std::cregex_iterator end() const {
             return std::cregex_iterator();
         }
 
@@ -50,8 +51,6 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
-    std::ios_base::sync_with_stdio(false);
-    std::cout << "main thread: " << std::this_thread::get_id() << newline;
     auto matches = rxcpp::sources::create<boost::filesystem::path>(
         [p = boost::filesystem::path(argv[2])](rxcpp::subscriber<boost::filesystem::path> sub) {
             std::cout << "observable thread: " << std::this_thread::get_id() << newline;
@@ -72,45 +71,33 @@ int main(int argc, char * argv[]) {
         .filter([](const auto& p){
                 return boost::filesystem::is_regular(p);
             })
-        .map([pattern = argv[1]](const auto& p) {
+        .map([pattern = argv[1]](auto&& p) {
                 return std::make_shared<file_reader>(
                     boost::interprocess::file_mapping(p.string().c_str(), boost::interprocess::read_only),
                     boost::filesystem::file_size(p),
                     std::regex(pattern)
                     );
             })
-        // .flat_map(
-        //     [](const auto& r){
-        //         // return observable<line and line number>
-        //     },
-        //     [](const auto& r, const auto& valid_line_and_line_number) {
-        //     }
-        //     )
         .filter([](const auto& r){
                 // I need to check if the file r contains valid utf-8 characters!
                 // I think I have to split the file to list of lines.
                 // A line is represented by string_view, a pair of pointer.
                 // Then match the regex with the line.
-                // @todo Don't forget to remove after debugging!
-                // @todo Don't forget to remove after debugging!
                 return utf8::is_valid(static_cast<char const*>(r->m.get_address()), static_cast<char const*>(r->m.get_address()) + r->m.get_size()) && r->begin() != r->end();
             });
 
     std::promise<void> pr;
     auto f = pr.get_future();
     matches
-        // .observe_on(rxcpp::synchronize_new_thread())
-        // .observe_on(rxcpp::serialize_new_thread())
-        .observe_on(rxcpp::observe_on_new_thread())
+        .observe_on(rxcpp::operators::observe_on_thread_pool())
         .subscribe([](const auto& p){
-                std::cout << "observing thread: " << std::this_thread::get_id() << newline;
                 try {
                     std::cout << p->f.get_name() << ":" << p->m.get_size() << newline;
-                    for(auto&& m : *p){
+                    for(auto const& m : *p){
                         std::cout << m[0] << newline;
                     }
                 } catch(...){
-                    std::cout << "something bad happend!" << std::endl;
+                    std::cerr << "something bad happend!" << std::endl;
                 }
             },
             [&pr](){
