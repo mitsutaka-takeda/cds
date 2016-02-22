@@ -12,13 +12,15 @@
 #include <regex>
 
 #include "utf8.h"
-#include "rx-threadpool.hpp"
+#include "stlab/future.hpp"
 
 namespace  {
     struct file_reader {
+        file_reader() = default;
         file_reader(boost::interprocess::file_mapping&& f_,
                     boost::uintmax_t s_,
-                    std::regex r_)
+                    std::shared_ptr<const std::regex> r_
+            )
             : f(std::move(f_)),
               m(f, f.get_mode(), 0, s_),
               r(std::move(r_))
@@ -26,8 +28,8 @@ namespace  {
         std::cregex_iterator
         begin() const {
             return std::cregex_iterator(static_cast<const char*>(m.get_address()),
-                                         static_cast<const char*>(m.get_address()) + m.get_size(),
-                                         r);
+                                        static_cast<const char*>(m.get_address()) + m.get_size(),
+                                        *r);
         }
 
         std::cregex_iterator end() const {
@@ -36,7 +38,31 @@ namespace  {
 
         boost::interprocess::file_mapping f;
         boost::interprocess::mapped_region m;
-        std::regex r;
+        std::shared_ptr<const std::regex> r;
+    };
+
+    struct result {
+    private:
+        file_reader fr;
+        std::vector<std::match_results<const char*> > r;
+    public:
+        using const_iterator = std::vector<std::match_results<const char*> >::const_iterator;
+        result() = default;
+        result(file_reader&& fr_,
+               std::vector<std::match_results<const char*> >&& r_)
+            : fr(std::move(fr_)),
+              r(std::move(r_)) {
+        }
+
+        const_iterator 
+        begin() const {
+            return r.cbegin();
+        }
+
+        const_iterator
+        end() const {
+            return r.cend();
+        }
     };
 
     template< class CharT, class Traits >
@@ -45,68 +71,59 @@ namespace  {
     }
 } // namespace
 
-int main(int argc, char * argv[]) {
+int main(int argc, char * argv[]) try {
     if(argc != 3){
         std::cout << "cds PATTERN PATH" << std::endl;
         return 1;
     }
 
-    auto matches = rxcpp::sources::create<boost::filesystem::path>(
-        [p = boost::filesystem::path(argv[2])](rxcpp::subscriber<boost::filesystem::path> sub) {
-            std::cout << "observable thread: " << std::this_thread::get_id() << newline;
-            try{
-                std::for_each(boost::filesystem::recursive_directory_iterator(p),
-                              boost::filesystem::recursive_directory_iterator(),
-                              [&sub](const auto& d){
-                                  sub.on_next(d.path());
-                              });
-            }
-            catch(...) {
-                std::clog << "Something bad happend." << std::endl;
-                sub.on_error(std::current_exception());
-                return;
-            }
-            sub.on_completed();
-        })
-        .filter([](const auto& p){
-                return boost::filesystem::is_regular(p);
-            })
-        .map([pattern = argv[1]](auto&& p) {
-                return std::make_shared<file_reader>(
-                    boost::interprocess::file_mapping(p.string().c_str(), boost::interprocess::read_only),
-                    boost::filesystem::file_size(p),
-                    std::regex(pattern)
-                    );
-            })
-        .filter([](const auto& r){
-                // I need to check if the file r contains valid utf-8 characters!
-                // I think I have to split the file to list of lines.
-                // A line is represented by string_view, a pair of pointer.
-                // Then match the regex with the line.
-                return utf8::is_valid(static_cast<char const*>(r->m.get_address()), static_cast<char const*>(r->m.get_address()) + r->m.get_size()) && r->begin() != r->end();
-            });
+    auto scheduler = stlab::default_scheduler();
 
-    std::promise<void> pr;
-    auto f = pr.get_future();
-    matches
-        .observe_on(rxcpp::operators::observe_on_thread_pool())
-        .subscribe([](const auto& p){
-                try {
-                    std::cout << p->f.get_name() << ":" << p->m.get_size() << newline;
-                    for(auto const& m : *p){
-                        std::cout << m[0] << newline;
-                    }
-                } catch(...){
-                    std::cerr << "something bad happend!" << std::endl;
-                }
-            },
-            [&pr](){
-                pr.set_value();
-            }
-            );
+    std::list<stlab::future<result>> tasks;
 
-    f.wait();
+    auto pattern = std::make_shared<std::regex const>(argv[1]);
+
+    std::for_each(boost::filesystem::recursive_directory_iterator(boost::filesystem::path(argv[2])),
+                  boost::filesystem::recursive_directory_iterator(),
+                  [&](const auto& d){
+                      const auto p = d.path();
+                      if(!boost::filesystem::is_regular(p)){
+                          return;
+                      }
+
+                      tasks.push_back(stlab::async(
+                          scheduler,
+                          [p = std::move(p), pattern](){
+                              file_reader 
+                                  fr{boost::interprocess::file_mapping(p.string().c_str(), boost::interprocess::read_only),
+                                      boost::filesystem::file_size(p),
+                                      pattern};
+                              auto const begin = static_cast<char const*>(fr.m.get_address()),
+                                  end = static_cast<char const*>(fr.m.get_address()) + fr.m.get_size();
+                              if(!utf8::is_valid(begin, end)){
+                                  return result{};
+                              }
+                              else{
+                                  auto const crbegin = fr.begin(), crend = fr.end();
+                                  return result{std::move(fr), std::vector<std::match_results<const char*> >(crbegin, crend)};
+                              }
+                          }));
+                  });
+
+    while(!tasks.empty()){
+        decltype(tasks.begin()->get_try()) r;
+        auto ready = std::find_if(tasks.begin(), tasks.end(), [&r](auto& t) { return static_cast<bool>(r = t.get_try()); });
+        if(ready == tasks.end()){
+            continue;
+        }
+        for(const auto& m: *r){
+            std::cout << m[0] << newline;
+        }
+        tasks.erase(ready);
+    }
     std::cout << "last" << std::endl;
     
     return 0;
+} catch(std::future_error& fe){
+    std::cerr << fe.what() << std::endl;
 }

@@ -13,6 +13,10 @@ if(NOT TARGET utfcpp)
   add_subdirectory("../utfcpp" "${CMAKE_BINARY_DIR}/utfcpp")
 endif()
 
+if(NOT TARGET stlab-libraries)
+  add_subdirectory("../libraries" "${CMAKE_BINARY_DIR}/stlab-libraries")
+endif()
+
 add_executable(
   cds
   main.cpp
@@ -34,6 +38,7 @@ target_link_libraries(
   PRIVATE
   RxCpp
   utfcpp
+  stlab-libraries
   ${Boost_FILESYSTEM_LIBRARY}
   ${Boost_SYSTEM_LIBRARY}
   Threads::Threads
