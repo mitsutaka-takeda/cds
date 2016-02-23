@@ -1,6 +1,5 @@
 #include <iostream>
 #include <thread>
-#include <rxcpp/rx.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/interprocess/file_mapping.hpp>
@@ -66,8 +65,9 @@ namespace  {
     };
 
     template< class CharT, class Traits >
-    std::basic_ostream<CharT, Traits>& newline(std::basic_ostream<CharT, Traits>& os) {
-        return os.put(os.widen('\n'));
+    std::basic_ostream<CharT, Traits>& newline(std::basic_ostream<CharT, Traits>& os) noexcept {
+        // return os.put(os.widen('\n'));
+        return os.put('\n');
     }
 } // namespace
 
@@ -81,7 +81,9 @@ int main(int argc, char * argv[]) try {
 
     std::list<stlab::future<result>> tasks;
 
-    auto pattern = std::make_shared<std::regex const>(argv[1]);
+    auto pattern = std::make_shared<std::regex const>(argv[1], std::regex::optimize|std::regex::nosubs);
+
+    std::ios_base::sync_with_stdio(false);
 
     std::for_each(boost::filesystem::recursive_directory_iterator(boost::filesystem::path(argv[2])),
                   boost::filesystem::recursive_directory_iterator(),
