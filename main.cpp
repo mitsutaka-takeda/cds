@@ -62,8 +62,6 @@ int main(int argc, char * argv[]) try {
     using namespace std::literals;
     auto const pattern = std::regex(argv[1], std::regex::optimize|std::regex::nosubs);
 
-    std::ios_base::sync_with_stdio(false);
-
     std::for_each(boost::filesystem::recursive_directory_iterator(boost::filesystem::path(argv[2])),
                   boost::filesystem::recursive_directory_iterator(),
                   [&](const auto& d){
@@ -96,10 +94,7 @@ int main(int argc, char * argv[]) try {
                                           buf.insert(buf.size(), i, next - i);
                                           buf.push_back('\n');
                                       }
-                                      if(next == end){ 
-                                          break;
-                                      }
-                                      i = next + 1;
+                                      i = std::find_if(next, end, [](const auto ch) { return ch != '\n'; });
                                       ++line_number;
                                   }
 
@@ -108,20 +103,21 @@ int main(int argc, char * argv[]) try {
                           }));
                   });
 
+    std::ios_base::sync_with_stdio(false);
+    std::ostreambuf_iterator<char> os(std::cout);
     while(!tasks.empty()){
         decltype(tasks.begin()->get_try()) r;
         auto ready = std::find_if(tasks.begin(), tasks.end(), [&r](auto& t) { return static_cast<bool>(r = t.get_try()); });
         if(ready == tasks.end()){
             continue;
         }
-
-        std::cout << *r;
-
+        std::copy(r->cbegin(), r->cend(), os);
         tasks.erase(ready);
     }
-    std::cout << "last" << std::endl;
     
     return 0;
 } catch(std::future_error& fe){
     std::cerr << fe.what() << std::endl;
+} catch(std::exception& e){
+   std::cerr << e.what() << std::endl;
 }
