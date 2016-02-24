@@ -82,23 +82,29 @@ int main(int argc, char * argv[]) try {
                                   return ""s;
                               }
                               else{
-                                  std::string buf;
+                                  auto const file_name = p.string();
+                                  std::string buf{file_name};
                                   buf.reserve(100);
                                   auto i = begin;
                                   auto line_number = 1u;
                                   while(i != end){
                                       const auto next = std::find(i, end, '\n');
                                       if(std::regex_match(i, next, pattern)) {
+                                          buf.push_back('\n');
                                           // next can be either end or iterator pointing to '\n'.
                                           buf.append(std::to_string(line_number) + ":");
                                           buf.insert(buf.size(), i, next - i);
-                                          buf.push_back('\n');
                                       }
                                       i = std::find_if(next, end, [](const auto ch) { return ch != '\n'; });
                                       ++line_number;
                                   }
 
-                                  return buf;
+                                  if(buf == file_name){
+                                      return ""s;
+                                  } else {
+                                      buf.append("\n\n");
+                                      return buf;
+                                  }
                               }
                           }));
                   });
