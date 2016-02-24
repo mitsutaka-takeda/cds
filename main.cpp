@@ -4,6 +4,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -51,15 +52,15 @@ int main(int argc, char * argv[]) try {
                                   auto i = begin;
                                   auto line_number = 1u;
                                   while(i != end){
-                                      const auto next = std::find(i, end, '\n');
+                                      char const * const next = std::find(i, end, '\n');
                                       if(std::regex_match(i, next, pattern)) {
                                           buf.push_back('\n');
                                           // next can be either end or iterator pointing to '\n'.
                                           buf.append(std::to_string(line_number) + ":");
-                                          buf.insert(buf.size(), i, next - i);
+                                          buf.insert(buf.size(), i, boost::numeric_cast<std::string::size_type>(next - i));
                                       }
                                       i = std::find_if(next, end, [](const auto ch) { return ch != '\n'; });
-                                      ++line_number;
+                                      line_number += (i - next);
                                   }
 
                                   if(buf == file_name){
