@@ -17,50 +17,29 @@ namespace  {
     struct file_reader {
         file_reader() = default;
         file_reader(boost::interprocess::file_mapping&& f_,
-                    boost::uintmax_t s_,
-                    std::shared_ptr<const std::regex> r_
-            )
+                    boost::uintmax_t s_)
             : f(std::move(f_)),
-              m(f, f.get_mode(), 0, s_),
-              r(std::move(r_))
+              m(f, f.get_mode(), 0, s_)
             {}
-        std::cregex_iterator
-        begin() const {
-            return std::cregex_iterator(static_cast<const char*>(m.get_address()),
-                                        static_cast<const char*>(m.get_address()) + m.get_size(),
-                                        *r);
-        }
-
-        std::cregex_iterator end() const {
-            return std::cregex_iterator();
-        }
-
         boost::interprocess::file_mapping f;
         boost::interprocess::mapped_region m;
-        std::shared_ptr<const std::regex> r;
     };
 
     struct result {
     private:
         file_reader fr;
-        std::vector<std::match_results<const char*> > r;
+        std::string s;
     public:
         using const_iterator = std::vector<std::match_results<const char*> >::const_iterator;
         result() = default;
         result(file_reader&& fr_,
-               std::vector<std::match_results<const char*> >&& r_)
+               std::string s_)
             : fr(std::move(fr_)),
-              r(std::move(r_)) {
+              s(std::move(s_)) {
         }
 
-        const_iterator 
-        begin() const {
-            return r.cbegin();
-        }
-
-        const_iterator
-        end() const {
-            return r.cend();
+        const std::string& str() const noexcept {
+            return s;
         }
     };
 
@@ -79,9 +58,9 @@ int main(int argc, char * argv[]) try {
 
     auto scheduler = stlab::default_scheduler();
 
-    std::list<stlab::future<result>> tasks;
-
-    auto pattern = std::make_shared<std::regex const>(argv[1], std::regex::optimize|std::regex::nosubs);
+    std::list<stlab::future<std::string>> tasks;
+    using namespace std::literals;
+    auto const pattern = std::regex(argv[1], std::regex::optimize|std::regex::nosubs);
 
     std::ios_base::sync_with_stdio(false);
 
@@ -95,19 +74,36 @@ int main(int argc, char * argv[]) try {
 
                       tasks.push_back(stlab::async(
                           scheduler,
-                          [p = std::move(p), pattern](){
+                          [p = std::move(p), &pattern](){
                               file_reader 
                                   fr{boost::interprocess::file_mapping(p.string().c_str(), boost::interprocess::read_only),
-                                      boost::filesystem::file_size(p),
-                                      pattern};
+                                      boost::filesystem::file_size(p)};
                               auto const begin = static_cast<char const*>(fr.m.get_address()),
                                   end = static_cast<char const*>(fr.m.get_address()) + fr.m.get_size();
                               if(!utf8::is_valid(begin, end)){
-                                  return result{};
+                                  return ""s;
                               }
                               else{
-                                  auto const crbegin = fr.begin(), crend = fr.end();
-                                  return result{std::move(fr), std::vector<std::match_results<const char*> >(crbegin, crend)};
+                                  std::string buf;
+                                  buf.reserve(100);
+                                  auto i = begin;
+                                  auto line_number = 1u;
+                                  while(i != end){
+                                      const auto next = std::find(i, end, '\n');
+                                      if(std::regex_match(i, next, pattern)) {
+                                          // next can be either end or iterator pointing to '\n'.
+                                          buf.append(std::to_string(line_number) + ":");
+                                          buf.insert(buf.size(), i, next - i);
+                                          buf.push_back('\n');
+                                      }
+                                      if(next == end){ 
+                                          break;
+                                      }
+                                      i = next + 1;
+                                      ++line_number;
+                                  }
+
+                                  return buf;
                               }
                           }));
                   });
@@ -118,9 +114,9 @@ int main(int argc, char * argv[]) try {
         if(ready == tasks.end()){
             continue;
         }
-        for(const auto& m: *r){
-            std::cout << m[0] << newline;
-        }
+
+        std::cout << *r;
+
         tasks.erase(ready);
     }
     std::cout << "last" << std::endl;
