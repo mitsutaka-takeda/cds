@@ -13,14 +13,6 @@
 #include "utf8.h"
 #include "stlab/future.hpp"
 
-namespace  {
-    template< class CharT, class Traits >
-    std::basic_ostream<CharT, Traits>& newline(std::basic_ostream<CharT, Traits>& os) noexcept {
-        // return os.put(os.widen('\n'));
-        return os.put('\n');
-    }
-} // namespace
-
 int main(int argc, char * argv[]) try {
     if(argc != 3){
         std::cout << "cds PATTERN PATH" << std::endl;
