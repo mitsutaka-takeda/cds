@@ -1,15 +1,14 @@
+#include <algorithm>
 #include <iostream>
+#include <iterator>
+#include <regex>
+#include <string>
 #include <thread>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-
-#include <algorithm>
-#include <iterator>
-#include <string>
-#include <regex>
 
 #include "utf8.h"
 #include "stlab/future.hpp"
@@ -37,8 +36,13 @@ int main(int argc, char * argv[]) try {
                       tasks.push_back(stlab::async(
                           scheduler,
                           [p = std::move(p), &pattern](){
+                              auto const fs = boost::filesystem::file_size(p);
+                              if(fs == 0){
+                                  return ""s;
+                              }
+
                               boost::interprocess::file_mapping fm(p.string().c_str(), boost::interprocess::read_only);
-                              boost::interprocess::mapped_region m(fm, fm.get_mode(), 0, boost::filesystem::file_size(p));
+                              boost::interprocess::mapped_region m(fm, fm.get_mode(), 0, fs);
 
                               auto const begin = static_cast<char const*>(m.get_address()),
                                   end = static_cast<char const*>(m.get_address()) + m.get_size();
