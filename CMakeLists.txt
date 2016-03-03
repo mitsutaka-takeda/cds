@@ -13,10 +13,6 @@ if(NOT TARGET stlab-libraries)
   add_subdirectory("../libraries" "${CMAKE_BINARY_DIR}/stlab-libraries")
 endif()
 
-if(NOT TARGET cppformat)
-  add_subdirectory("../cppformat" "${CMAKE_BINARY_DIR}/cppformat")
-endif()
-
 add_executable(
   cds
   main.cpp
