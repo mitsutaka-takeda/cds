@@ -1,22 +1,18 @@
 * Requirements
 
-  cmake(>= 3.3)
-  BOOST(1.59.0)
-  https://github.com/mitsutaka-takeda/utfcpp.git
-  https://github.com/mitsutaka-takeda/libraries.git
+  - cmake(>= 3.3)
+  - BOOST(1.59.0)
+  - https://github.com/mitsutaka-takeda/utfcpp.git
+  - https://github.com/mitsutaka-takeda/libraries.git
 
 * How to build
 
   Clone the following repositories at the same level as this repositoy.
 
-  https://github.com/mitsutaka-takeda/utfcpp.git
-  https://github.com/mitsutaka-takeda/libraries.git
+  - https://github.com/mitsutaka-takeda/utfcpp.git
+  - https://github.com/mitsutaka-takeda/libraries.git
 
-  So after cloning, the directory looks like this:
-    .
-    ├── cds
-    ├── libraries
-    └── utfcpp
+  So after cloning, a directory contains directories; cds, libraries, and utfcpp.
 
   Use cmake to generate and build cds.
 
