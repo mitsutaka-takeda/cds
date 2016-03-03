@@ -46,9 +46,3 @@ target_include_directories(
   PRIVATE
   ${Boost_INCLUDE_DIRS}
   )
-
-# Comapile with clang && libstdc++
-# The executable built with clang will crash. Maybe it's because of that Boost is built with gcc.
-# CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBOOST_ROOT=path/to/boost_1_59_0 -DCMAKE_CXX_FLAGS=-stdlib=libstdc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libstdc++ /path/to/cds/ &
-# Compile with gcc
-# CC=gcc CXX=g++ cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBOOST_ROOT=/home/mtakeda/etc/boost_1_59_0/ /home/mtakeda/src/cpp/cds/ &

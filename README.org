@@ -1,0 +1,35 @@
+* Requirements
+
+  cmake(>= 3.3)
+  BOOST(1.59.0)
+  https://github.com/mitsutaka-takeda/utfcpp.git
+  https://github.com/mitsutaka-takeda/libraries.git
+
+* How to build
+
+  Clone the following repositories at the same level as this repositoy.
+
+  https://github.com/mitsutaka-takeda/utfcpp.git
+  https://github.com/mitsutaka-takeda/libraries.git
+
+  So after cloning, the directory looks like this:
+    .
+    ├── cds
+    ├── libraries
+    └── utfcpp
+
+  Use cmake to generate and build cds.
+
+  #+BEGIN_SRC shell
+  mkdir build
+  pushd build
+
+  # Generate Makefile project with Clang
+  CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBOOST_ROOT=path/to/boost_1_59_0 -DCMAKE_CXX_FLAGS=-stdlib=libstdc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libstdc++ ../cds
+
+  # Generate Makefile project with GCC
+  CC=gcc CXX=g++ cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBOOST_ROOT=path/to/boost_1_59_0/ ../cds
+
+  # The build step is the same for both Clang & GCC
+  cmake --build ./
+  #+END_SRC
